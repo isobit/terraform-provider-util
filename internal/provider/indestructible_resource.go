@@ -28,7 +28,16 @@ func (r *IndestructibleResource) Metadata(ctx context.Context, req resource.Meta
 
 func (r *IndestructibleResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Indestructible resource",
+		MarkdownDescription: `
+The ` + "`util_indestructible`" + ` resource creates a node in the resource
+graph that cannot be destroyed unless the ` + "`allow_destroy`" + ` attribute
+is set to ` + "`true`" + ` in the state. This provides a workaround to a
+[well-known shortcoming](https://github.com/hashicorp/terraform/issues/17599)
+of the ` + "`prevent_destroy`" + ` lifecycle attribute by exploiting
+dependency order to prevent the destruction of resources that are dependencies
+of the indestructible resource, since it must be destroyed before the dependencies
+are.
+`,
 
 		Attributes: map[string]schema.Attribute{
 			"allow_destroy": schema.BoolAttribute{
