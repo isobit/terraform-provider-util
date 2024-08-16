@@ -57,5 +57,7 @@ resource "util_indestructible" "this" {
 
 ### Optional
 
+- `allow_bypass` (Boolean) Whether to allow destruction when `bypass_indestructible` is set on the provider.
 - `allow_destroy` (Boolean) Whether to allow destruction.
 - `error_message` (String) Additional message to include in the error message when attempting to destroy when `allow_destroy` is `false`.
+- `protected_value` (Dynamic)
