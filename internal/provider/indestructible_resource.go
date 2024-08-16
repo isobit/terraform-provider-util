@@ -2,9 +2,13 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/dynamicplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -12,11 +16,15 @@ import (
 var _ resource.Resource = &IndestructibleResource{}
 
 type IndestructibleResourceModel struct {
-	AllowDestroy types.Bool   `tfsdk:"allow_destroy"`
-	ErrorMessage types.String `tfsdk:"error_message"`
+	AllowDestroy   types.Bool    `tfsdk:"allow_destroy"`
+	AllowBypass    types.Bool    `tfsdk:"allow_bypass"`
+	ErrorMessage   types.String  `tfsdk:"error_message"`
+	ProtectedValue types.Dynamic `tfsdk:"protected_value"`
 }
 
-type IndestructibleResource struct{}
+type IndestructibleResource struct {
+	Bypass bool
+}
 
 func NewIndestructibleResource() resource.Resource {
 	return &IndestructibleResource{}
@@ -44,12 +52,52 @@ are.
 				MarkdownDescription: "Whether to allow destruction.",
 				Optional:            true,
 			},
+			"allow_bypass": schema.BoolAttribute{
+				MarkdownDescription: "Whether to allow destruction when `bypass_indestructible` is set on the provider.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(true),
+			},
 			"error_message": schema.StringAttribute{
 				MarkdownDescription: "Additional message to include in the error message when attempting to destroy when `allow_destroy` is `false`.",
 				Optional:            true,
 			},
+			"protected_value": schema.DynamicAttribute{
+				MarkdownDescription: "",
+				Optional:            true,
+				PlanModifiers: []planmodifier.Dynamic{
+					dynamicplanmodifier.RequiresReplaceIf(
+						func(ctx context.Context, req planmodifier.DynamicRequest, resp *dynamicplanmodifier.RequiresReplaceIfFuncResponse) {
+							if req.StateValue.IsNull() {
+								return
+							}
+							resp.RequiresReplace = true
+						},
+						"",
+						"",
+					),
+				},
+			},
 		},
 	}
+}
+
+func (r *IndestructibleResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	// Prevent panic if the provider has not been configured.
+	if req.ProviderData == nil {
+		return
+	}
+
+	cfg, ok := req.ProviderData.(*ProviderConfig)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected *ProviderModel, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+		return
+	}
+
+	r.Bypass = cfg.BypassIndestructible
 }
 
 func (r *IndestructibleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -89,17 +137,26 @@ func (r *IndestructibleResource) Delete(ctx context.Context, req resource.Delete
 
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if !data.AllowDestroy.ValueBool() {
-		msg := "Cannot destroy indestructible resource unless allow_destroy is set in state. To continue with destruction, set allow_destroy to true and apply, and then remove."
-		if extraMsg := data.ErrorMessage.ValueString(); extraMsg != "" {
-			msg += "\n\n" + extraMsg
-		}
-		resp.Diagnostics.AddError("Not Allowed", msg)
+	if data.AllowDestroy.ValueBool() {
 		return
 	}
+
+	bypass := r.Bypass && data.AllowBypass.ValueBool()
+	if bypass {
+		resp.Diagnostics.AddWarning("Bypassing Destroy Protection", "Proceeding to destroy util_indestructible instance due to bypass_indestructible being true on the provider, and allow_bypass being true on the resource.")
+		return
+	}
+
+	msg := "Cannot destroy indestructible resource unless allow_destroy is set in state.\n" +
+		"To continue with destruction, set allow_destroy to true and apply first.\n" +
+		"Or, unless otherwise prohibited, set bypass_indestructible on the provider, or set\n" +
+		"the TF_UTIL_BYPASS_INDESTRUCTIBLE env var to \"true\"."
+	if extraMsg := data.ErrorMessage.ValueString(); extraMsg != "" {
+		msg += "\n\n" + extraMsg
+	}
+	resp.Diagnostics.AddError("Destruction Not Allowed", msg)
 }
