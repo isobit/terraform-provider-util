@@ -63,8 +63,15 @@ are.
 				Optional:            true,
 			},
 			"protected_value": schema.DynamicAttribute{
-				MarkdownDescription: "",
-				Optional:            true,
+				MarkdownDescription: "The protected value can be any attribute of the protected resource that " +
+					"would change under replacement. The resource can be also be protected using " +
+					"an explicit `depends_on`, but in that case the resource also needs to have " +
+					"`prevent_destroy = true` in the lifecycle configuration to prevent " +
+					"destruction during replacement. Using protected_value simultaneously " +
+					"implies the dependency relationship, and protects against destruction " +
+					"during replacement by causing the indestructible resource itself to also be " +
+					"replaced when the protected resource is replaced.",
+				Optional: true,
 				PlanModifiers: []planmodifier.Dynamic{
 					dynamicplanmodifier.RequiresReplaceIf(
 						func(ctx context.Context, req planmodifier.DynamicRequest, resp *dynamicplanmodifier.RequiresReplaceIfFuncResponse) {

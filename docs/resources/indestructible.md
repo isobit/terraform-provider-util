@@ -28,24 +28,22 @@ are.
 
 ```terraform
 # Example of a resource that will be protected from destruction.
-resource "terraform_data" "protected" {
-	# It is still important to configure the lifecycle with prevent_destroy to
-	# avoid destruction if the plan requires replacement. Note that
-	# prevent_destroy alone does not prevent destruction when the entire config
-	# is removed; util_indestructible.this is needed to prevent that.
-	lifecycle {
-		prevent_destroy = true
-	}
-}
+resource "terraform_data" "protected" {}
 
 # This indestructible resources protects the resource from destruction by
 # depending on it; if terraform tries to destroy the proected resource, it will
 # destroy util_indestructible.this first, which will fail unless allow_destroy
 # is set to true.
 resource "util_indestructible" "this" {
-	depends_on = [
-		terraform_data.protected,
-	]
+	# The protected value can be any attribute of the protected resource that
+	# would change under replacement. The resource can be also be protected using
+	# an explicit "depends_on", but in that case the resource also needs to have
+	# "prevent_destroy = true" in the lifecycle configuration to prevent
+	# destruction during replacement. Using protected_value simultaneously
+	# implies the dependency relationship, and protects against destruction
+	# during replacement by causing the indestructible resource itself to also be
+	# replaced when the protected resource is replaced.
+	protected_value = terraform_data.protected.id
 	# Custom messages are optional, but helpful to explain why it is important to
 	# avoid destroying the protected resources.
 	error_message = "Destroying terraform_data.protected will cause major issues, please don't destroy it!"
@@ -60,4 +58,4 @@ resource "util_indestructible" "this" {
 - `allow_bypass` (Boolean) Whether to allow destruction when `bypass_indestructible` is set on the provider.
 - `allow_destroy` (Boolean) Whether to allow destruction.
 - `error_message` (String) Additional message to include in the error message when attempting to destroy when `allow_destroy` is `false`.
-- `protected_value` (Dynamic)
+- `protected_value` (Dynamic) The protected value can be any attribute of the protected resource that would change under replacement. The resource can be also be protected using an explicit `depends_on`, but in that case the resource also needs to have `prevent_destroy = true` in the lifecycle configuration to prevent destruction during replacement. Using protected_value simultaneously implies the dependency relationship, and protects against destruction during replacement by causing the indestructible resource itself to also be replaced when the protected resource is replaced.

@@ -10,7 +10,7 @@ resource "util_indestructible" "this" {
 	# would change under replacement. The resource can be also be protected using
 	# an explicit "depends_on", but in that case the resource also needs to have
 	# "prevent_destroy = true" in the lifecycle configuration to prevent
-	# destruction during replacement. Using protected_values simultaneously
+	# destruction during replacement. Using protected_value simultaneously
 	# implies the dependency relationship, and protects against destruction
 	# during replacement by causing the indestructible resource itself to also be
 	# replaced when the protected resource is replaced.
