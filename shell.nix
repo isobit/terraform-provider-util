@@ -7,5 +7,6 @@ pkgs.mkShell {
     gnumake
     go
     golangci-lint
+    terraform
   ];
 }
